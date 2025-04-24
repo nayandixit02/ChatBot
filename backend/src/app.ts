@@ -13,7 +13,7 @@ const app = express();
 // app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(
   cors({
-    origin: "https://your-frontend-site.onrender.com",
+    origin: "https://chatbot-8y9v.onrender.com",
     credentials: true,
   })
 );
