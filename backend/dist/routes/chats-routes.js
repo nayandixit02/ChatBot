@@ -5,7 +5,8 @@ import { deleteChats, generateChatCompletion, sendChatsToUser, } from "../contro
 //Protected API
 const chatRoutes = Router();
 chatRoutes.post("/new", validate(chatCompletionValidator), verifyToken, generateChatCompletion);
-chatRoutes.get("/all-chats", verifyToken, sendChatsToUser);
+//chatRoutes.get("/all-chats", verifyToken, sendChatsToUser);
+chatRoutes.get("/chats", verifyToken, sendChatsToUser);
 chatRoutes.delete("/delete", verifyToken, deleteChats);
 export default chatRoutes;
 //# sourceMappingURL=chats-routes.js.map

@@ -43,7 +43,7 @@ export const sendChatsToUser = async (req, res, next) => {
         if (user._id.toString() !== res.locals.jwtData.id) {
             return res.status(401).send("Permissions didn't match");
         }
-        return res.status(200).json({ message: "OK", chats: user.chats });
+        return res.status(200).json({ message: "OK", chats: user.chats || [] });
     }
     catch (error) {
         console.log(error);
