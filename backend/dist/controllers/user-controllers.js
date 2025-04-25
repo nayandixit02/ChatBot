@@ -26,20 +26,22 @@ export const userSignup = async (req, res, next) => {
         await user.save();
         //create token and store cookie
         res.clearCookie(COOKIE_NAME, {
-            httpOnly: true,
-            domain: "localhost",
-            signed: true,
             path: "/",
+            httpOnly: true,
+            signed: true,
+            secure: true,
+            sameSite: "none",
         });
         const token = createToken(user._id.toString(), user.email, "7d");
         const expires = new Date();
         expires.setDate(expires.getDate() + 7);
         res.cookie(COOKIE_NAME, token, {
             path: "/",
-            domain: "localhost",
-            expires,
             httpOnly: true,
             signed: true,
+            secure: true,
+            sameSite: "none",
+            expires,
         });
         return res.status(201).json({ message: "OK", id: user._id.toString() });
     }
@@ -61,20 +63,22 @@ export const userLogin = async (req, res, next) => {
             return res.status(403).send("Incorrect Password");
         }
         res.clearCookie(COOKIE_NAME, {
-            httpOnly: true,
-            domain: "localhost",
-            signed: true,
             path: "/",
+            httpOnly: true,
+            signed: true,
+            secure: true,
+            sameSite: "none",
         });
         const token = createToken(user._id.toString(), user.email, "7d");
         const expires = new Date();
         expires.setDate(expires.getDate() + 7);
         res.cookie(COOKIE_NAME, token, {
             path: "/",
-            domain: "localhost",
-            expires,
             httpOnly: true,
             signed: true,
+            secure: true,
+            sameSite: "none",
+            expires,
         });
         return res.status(200).json({ message: "OK", id: user._id.toString() });
     }
@@ -113,10 +117,11 @@ export const userLogout = async (req, res, next) => {
             return res.status(401).send("Permissions didn't match");
         }
         res.clearCookie(COOKIE_NAME, {
-            httpOnly: true,
-            domain: "localhost",
-            signed: true,
             path: "/",
+            httpOnly: true,
+            signed: true,
+            secure: true,
+            sameSite: "none",
         });
         return res
             .status(200)
