@@ -37,10 +37,11 @@ export const userSignup = async (
 
     //create token and store cookie
     res.clearCookie(COOKIE_NAME, {
-      httpOnly: true,
-      domain: "localhost",
-      signed: true,
       path: "/",
+      httpOnly: true,
+      signed: true,
+      secure: true,
+      sameSite: "none",
     });
 
     const token = createToken(user._id.toString(), user.email, "7d");
@@ -48,10 +49,11 @@ export const userSignup = async (
     expires.setDate(expires.getDate() + 7);
     res.cookie(COOKIE_NAME, token, {
       path: "/",
-      domain: "localhost",
-      expires,
       httpOnly: true,
       signed: true,
+      secure: true,
+      sameSite: "none",
+      expires,
     });
 
     return res.status(201).json({ message: "OK", id: user._id.toString() });
@@ -79,10 +81,11 @@ export const userLogin = async (
     }
 
     res.clearCookie(COOKIE_NAME, {
-      httpOnly: true,
-      domain: "localhost",
-      signed: true,
       path: "/",
+      httpOnly: true,
+      signed: true,
+      secure: true,
+      sameSite: "none",
     });
 
     const token = createToken(user._id.toString(), user.email, "7d");
@@ -90,10 +93,11 @@ export const userLogin = async (
     expires.setDate(expires.getDate() + 7);
     res.cookie(COOKIE_NAME, token, {
       path: "/",
-      domain: "localhost",
-      expires,
       httpOnly: true,
       signed: true,
+      secure: true,
+      sameSite: "none",
+      expires,
     });
 
     return res.status(200).json({ message: "OK", id: user._id.toString() });
@@ -142,10 +146,11 @@ export const userLogout = async (
     }
 
     res.clearCookie(COOKIE_NAME, {
-      httpOnly: true,
-      domain: "localhost",
-      signed: true,
       path: "/",
+      httpOnly: true,
+      signed: true,
+      secure: true,
+      sameSite: "none",
     });
 
     return res
