@@ -1,29 +1,11 @@
-import {
-  ReactNode,
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   checkAuthStatus,
   loginUser,
   logoutUser,
   signupUser,
 } from "../helpers/api-communicator";
-
-type User = {
-  name: string;
-  email: string;
-};
-type UserAuth = {
-  isLoggedIn: boolean;
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-};
-const AuthContext = createContext<UserAuth | null>(null);
+import { AuthContext, User, UserAuth } from "./AuthContext";
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -37,8 +19,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser({ email: data.email, name: data.name });
           setIsLoggedIn(true);
         }
-      } catch (err) {
-        console.error("Auth check failed", err);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          console.error("Auth check failed:", err.message);
+        } else {
+          console.error("Auth check failed with unknown error", err);
+        }
         setUser(null);
         setIsLoggedIn(false);
       }
@@ -53,6 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoggedIn(true);
     }
   };
+
   const signup = async (name: string, email: string, password: string) => {
     const data = await signupUser(name, email, password);
     if (data) {
@@ -60,21 +47,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoggedIn(true);
     }
   };
+
   const logout = async () => {
     await logoutUser();
-    setIsLoggedIn(false);
     setUser(null);
+    setIsLoggedIn(false);
     window.location.reload();
   };
 
-  const value = {
+  const value: UserAuth = {
     user,
     isLoggedIn,
     login,
-    logout,
     signup,
+    logout,
   };
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => useContext(AuthContext);
