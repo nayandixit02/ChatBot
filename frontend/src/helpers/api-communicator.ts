@@ -23,7 +23,7 @@ export const signupUser = async (
 
 export const checkAuthStatus = async () => {
   try {
-    const res = await axios.get("/user/auth-status");
+    const res = await axios.get("/user/auth-status", { withCredentials: true });
     if (res.status !== 200) throw new Error("Unable to authenticate");
     const data = res.data;
     return data;
