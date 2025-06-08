@@ -27,15 +27,15 @@ const Login = () => {
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+
     try {
       toast.loading("Signing In", { id: "login" });
       await auth?.login(email, password);
-      // setTimeout(() => {
-      //   navigate("/chat");
-      // }, 300)
       toast.success("Signed In Successfully", { id: "login" });
 
-      navigate("/chat");
+      setTimeout(() => {
+        navigate("/chat");
+      }, 300);
     } catch (error) {
       console.log(error);
       toast.error("Signing In Failed", { id: "login" });
