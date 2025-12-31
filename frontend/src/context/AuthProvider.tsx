@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
+import axios from "axios";
 import {
   checkAuthStatus,
   loginUser,
@@ -35,6 +36,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const data = await loginUser(email, password);
     if (data) {
+      if (data.token)
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
       setUser({ email: data.email, name: data.name });
       setIsLoggedIn(true);
     }
@@ -43,6 +46,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string) => {
     const data = await signupUser(name, email, password);
     if (data) {
+      if (data.token)
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
       setUser({ email: data.email, name: data.name });
       setIsLoggedIn(true);
     }

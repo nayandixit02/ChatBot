@@ -15,8 +15,13 @@ export const verifyToken = async (
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.cookies[`${COOKIE_NAME}`];
-  if (!token || token.trim() === "") {
+  // Accept token from cookie or Authorization header as fallback
+  const cookieToken = req.cookies?.[`${COOKIE_NAME}`];
+  const headerToken = req.headers?.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.split(" ")[1]
+    : undefined;
+  const token = cookieToken || headerToken;
+  if (!token || (typeof token === "string" && token.trim() === "")) {
     return res.status(401).json({ message: "Token Not Received" });
   }
   return new Promise<void>((resolve, reject) => {
