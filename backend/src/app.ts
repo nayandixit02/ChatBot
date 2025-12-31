@@ -11,9 +11,11 @@ const app = express();
 
 //middlewares
 // app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+const frontendOrigin =
+  process.env.FRONTEND_URL || "https://chatbot-8y9v.onrender.com";
 app.use(
   cors({
-    origin: "https://chatbot-8y9v.onrender.com",
+    origin: frontendOrigin,
     credentials: true,
   })
 );

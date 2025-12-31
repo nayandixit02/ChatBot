@@ -36,23 +36,23 @@ export const userSignup = async (
     await user.save();
 
     //create token and store cookie
-    res.clearCookie(COOKIE_NAME, {
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions: any = {
       path: "/",
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
-    });
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    };
+    // optional domain override for production (set COOKIE_DOMAIN env var if needed)
+    if (isProduction && process.env.COOKIE_DOMAIN)
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+
+    res.clearCookie(COOKIE_NAME, cookieOptions);
 
     const token = createToken(user._id.toString(), user.email, "7d");
     const expires = new Date();
     expires.setDate(expires.getDate() + 7);
-    res.cookie(COOKIE_NAME, token, {
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      expires,
-    });
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions, expires });
 
     return res.status(201).json({ message: "OK", id: user._id.toString() });
   } catch (error) {
@@ -80,23 +80,22 @@ export const userLogin = async (
       return res.status(403).send("Incorrect Password");
     }
 
-    res.clearCookie(COOKIE_NAME, {
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions: any = {
       path: "/",
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
-    });
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    };
+    if (isProduction && process.env.COOKIE_DOMAIN)
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+
+    res.clearCookie(COOKIE_NAME, cookieOptions);
 
     const token = createToken(user._id.toString(), user.email, "7d");
     const expires = new Date();
     expires.setDate(expires.getDate() + 7);
-    res.cookie(COOKIE_NAME, token, {
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      expires,
-    });
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions, expires });
 
     return res.status(200).json({ message: "OK", id: user._id.toString() });
   } catch (error) {
@@ -143,12 +142,17 @@ export const userLogout = async (
       return res.status(401).send("Permissions didn't match");
     }
 
-    res.clearCookie(COOKIE_NAME, {
+    const isProduction = process.env.NODE_ENV === "production";
+    const cookieOptions: any = {
       path: "/",
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
-    });
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+    };
+    if (isProduction && process.env.COOKIE_DOMAIN)
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+
+    res.clearCookie(COOKIE_NAME, cookieOptions);
 
     return res
       .status(200)

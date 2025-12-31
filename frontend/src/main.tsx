@@ -7,8 +7,8 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider.tsx";
 import { Toaster } from "react-hot-toast";
 import axios from "axios";
-// axios.defaults.baseURL = "http://localhost:5000/api/v1";
-axios.defaults.baseURL = "https://chatbot-backend-9rf1.onrender.com/api/v1";
+// Use relative API path so frontend calls the same origin backend (works on Render)
+axios.defaults.baseURL = "/api/v1";
 axios.defaults.withCredentials = true;
 
 const theme = createTheme({
