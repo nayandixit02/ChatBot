@@ -39,23 +39,21 @@ export const generateChatCompletion = async (
       assistantReply = result.response.text();
     } catch (err: any) {
       console.error("Generative AI error:", err?.message ?? err);
-      // Surface quota / rate-limit errors back to client with retry info when available
+      // On quota/rate-limit (429), record a friendly assistant fallback message
       if (err && err.status === 429) {
         const retryInfo = err.errorDetails?.find((d: any) =>
           d["@type"]?.includes("RetryInfo")
         );
         const retryDelay = retryInfo?.retryDelay ?? null;
-        return res.status(429).json({
-          message: "Generative AI quota exceeded",
-          retryAfter: retryDelay,
-        });
-      }
-      return res
-        .status(502)
-        .json({
+        assistantReply = `I'm temporarily unable to generate a response (AI quota exceeded). Please try again after ${
+          retryDelay ?? "a short while"
+        }.`;
+      } else {
+        return res.status(502).json({
           message: "AI provider error",
           cause: err?.message ?? String(err),
         });
+      }
     }
 
     if (assistantReply) {
