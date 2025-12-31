@@ -33,9 +33,30 @@ export const generateChatCompletion = async (
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const result = await model.generateContent([fullPrompt]);
-
-    const assistantReply = result.response.text();
+    let assistantReply: string | null = null;
+    try {
+      const result = await model.generateContent([fullPrompt]);
+      assistantReply = result.response.text();
+    } catch (err: any) {
+      console.error("Generative AI error:", err?.message ?? err);
+      // Surface quota / rate-limit errors back to client with retry info when available
+      if (err && err.status === 429) {
+        const retryInfo = err.errorDetails?.find((d: any) =>
+          d["@type"]?.includes("RetryInfo")
+        );
+        const retryDelay = retryInfo?.retryDelay ?? null;
+        return res.status(429).json({
+          message: "Generative AI quota exceeded",
+          retryAfter: retryDelay,
+        });
+      }
+      return res
+        .status(502)
+        .json({
+          message: "AI provider error",
+          cause: err?.message ?? String(err),
+        });
+    }
 
     if (assistantReply) {
       user.chats.push({

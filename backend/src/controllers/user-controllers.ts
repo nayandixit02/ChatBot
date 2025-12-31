@@ -70,10 +70,12 @@ export const userLogin = async (
     //user login
     const { email, password } = req.body;
     const user = await User.findOne({ email });
+    console.log("Login attempt:", { email, userFound: !!user });
     if (!user) {
       return res.status(401).send("User not registered");
     }
     const isPasswordCorrect = await compare(password, user.password);
+    console.log("Password match:", { email, match: isPasswordCorrect });
     if (!isPasswordCorrect) {
       return res.status(403).send("Incorrect Password");
     }
