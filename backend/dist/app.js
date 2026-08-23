@@ -4,20 +4,37 @@ import morgan from "morgan";
 import appRouter from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import chatRouter from "./routes/chats-routes.js";
 config();
 const app = express();
-//middlewares
-// app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+// middlewares
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:5000",
+    process.env.FRONTEND_URL,
+    "https://chatbot-8y9v.onrender.com",
+].filter(Boolean);
 app.use(cors({
-    origin: "https://chatbot-8y9v.onrender.com",
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server) or listed origins
+        if (!origin ||
+            allowedOrigins.includes(origin) ||
+            origin.endsWith(".onrender.com")) {
+            callback(null, true);
+        }
+        else {
+            callback(null, true);
+        }
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
-//remove it in production, it is only for development
-app.use(morgan("dev"));
+if (process.env.NODE_ENV !== "production") {
+    app.use(morgan("dev"));
+}
 app.use("/api/v1", appRouter);
-app.use("/api/v1/chat", chatRouter);
 export default app;
 //# sourceMappingURL=app.js.map

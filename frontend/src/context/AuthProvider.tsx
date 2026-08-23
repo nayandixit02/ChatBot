@@ -11,14 +11,25 @@ import { AuthContext, User, UserAuth } from "./AuthContext";
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function checkStatus() {
       try {
+        const storedToken = localStorage.getItem("token");
+        if (storedToken) {
+          axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+        }
         const data = await checkAuthStatus();
-        if (data) {
+        if (data && data.email) {
           setUser({ email: data.email, name: data.name });
           setIsLoggedIn(true);
+        } else {
+          // No valid session
+          localStorage.removeItem("token");
+          delete axios.defaults.headers.common["Authorization"];
+          setUser(null);
+          setIsLoggedIn(false);
         }
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -26,8 +37,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.error("Auth check failed with unknown error", err);
         }
+        localStorage.removeItem("token");
+        delete axios.defaults.headers.common["Authorization"];
         setUser(null);
         setIsLoggedIn(false);
+      } finally {
+        setLoading(false);
       }
     }
     checkStatus();
@@ -36,8 +51,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const data = await loginUser(email, password);
     if (data) {
-      if (data.token)
+      if (data.token) {
+        localStorage.setItem("token", data.token);
         axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+      }
       setUser({ email: data.email, name: data.name });
       setIsLoggedIn(true);
     }
@@ -46,23 +63,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string) => {
     const data = await signupUser(name, email, password);
     if (data) {
-      if (data.token)
+      if (data.token) {
+        localStorage.setItem("token", data.token);
         axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+      }
       setUser({ email: data.email, name: data.name });
       setIsLoggedIn(true);
     }
   };
 
   const logout = async () => {
-    await logoutUser();
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
     setUser(null);
     setIsLoggedIn(false);
-    window.location.reload();
+    window.location.href = "/login";
   };
 
   const value: UserAuth = {
     user,
     isLoggedIn,
+    loading,
     login,
     signup,
     logout,

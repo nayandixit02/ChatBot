@@ -4,34 +4,41 @@ import { Box, Typography, Button } from "@mui/material";
 import CustomizedInput from "../components/shared/CustomizedInput";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../context/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { getErrorMessage } from "../helpers/api-communicator";
+
 const Login = () => {
   const navigate = useNavigate();
   const auth = useAuth();
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const email = (formData.get("email") as string)?.trim();
+    const password = (formData.get("password") as string)?.trim();
+
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
     try {
-      toast.loading("Signing In", { id: "login" });
+      toast.loading("Signing In...", { id: "login" });
       await auth?.login(email, password);
       toast.success("Signed In Successfully", { id: "login" });
+      navigate("/chat");
     } catch (error) {
-      console.log(error);
-      toast.error("Signing In Failed", { id: "login" });
+      console.error("Login error:", error);
+      const msg = getErrorMessage(error, "Signing In Failed");
+      toast.error(msg, { id: "login" });
     }
   };
-  // useEffect(() => {
-  //   if (auth?.user) {
-  //     navigate("/chat");
-  //   }
-  // }, [auth, navigate]);
+
   useEffect(() => {
-    if (auth?.user) {
+    if (auth?.isLoggedIn && auth?.user) {
       navigate("/chat");
     }
-  }, [auth?.user, navigate]);
+  }, [auth?.isLoggedIn, auth?.user, navigate]);
 
   return (
     <Box width={"100%"} height={"100%"} display="flex" flex={1}>
@@ -83,6 +90,8 @@ const Login = () => {
                 width: "400px",
                 borderRadius: 2,
                 bgcolor: "#00fffc",
+                color: "black",
+                fontWeight: 600,
                 ":hover": {
                   bgcolor: "white",
                   color: "black",
@@ -92,6 +101,20 @@ const Login = () => {
             >
               Login
             </Button>
+            <Typography
+              textAlign="center"
+              mt={2}
+              fontSize="14px"
+              color="rgb(180, 180, 180)"
+            >
+              Don't have an account?{" "}
+              <Link
+                to="/signup"
+                style={{ color: "#00fffc", textDecoration: "none", fontWeight: 600 }}
+              >
+                Sign up here
+              </Link>
+            </Typography>
           </Box>
         </form>
       </Box>

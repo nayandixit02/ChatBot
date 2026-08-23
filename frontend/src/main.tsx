@@ -7,9 +7,28 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider.tsx";
 import { Toaster } from "react-hot-toast";
 import axios from "axios";
-// Use relative API path so frontend calls the same origin backend (works on Render)
-axios.defaults.baseURL = "/api/v1";
+const backendUrl =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "https://chatbot-backend-9rf1.onrender.com/api/v1";
+
+axios.defaults.baseURL = backendUrl;
 axios.defaults.withCredentials = true;
+
+// Preload token if exists in storage
+const storedToken = localStorage.getItem("token");
+if (storedToken) {
+  axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+}
+
+// Request interceptor to automatically attach JWT to every request
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token && config.headers) {
+    config.headers["Authorization"] = `Bearer ${token}`;
+  }
+  return config;
+});
 
 const theme = createTheme({
   typography: {

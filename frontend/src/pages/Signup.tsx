@@ -4,30 +4,48 @@ import { Box, Typography, Button } from "@mui/material";
 import CustomizedInput from "../components/shared/CustomizedInput";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../context/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { getErrorMessage } from "../helpers/api-communicator";
+
 const Signup = () => {
   const navigate = useNavigate();
   const auth = useAuth();
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const name = (formData.get("name") as string)?.trim();
+    const email = (formData.get("email") as string)?.trim();
+    const password = (formData.get("password") as string)?.trim();
+
+    if (!name || !email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     try {
-      toast.loading("Signing Up", { id: "signup" });
+      toast.loading("Signing Up...", { id: "signup" });
       await auth?.signup(name, email, password);
       toast.success("Signed Up Successfully", { id: "signup" });
+      navigate("/chat");
     } catch (error) {
-      console.log(error);
-      toast.error("Signing Up Failed", { id: "signup" });
+      console.error("Signup error:", error);
+      const msg = getErrorMessage(error, "Signing Up Failed");
+      toast.error(msg, { id: "signup" });
     }
   };
+
   useEffect(() => {
-    if (auth?.user) {
+    if (auth?.isLoggedIn && auth?.user) {
       navigate("/chat");
     }
-  }, [auth, navigate]);
+  }, [auth?.isLoggedIn, auth?.user, navigate]);
+
   return (
     <Box width={"100%"} height={"100%"} display="flex" flex={1}>
       <Box padding={8} mt={8} display={{ md: "flex", sm: "none", xs: "none" }}>
@@ -79,6 +97,8 @@ const Signup = () => {
                 width: "400px",
                 borderRadius: 2,
                 bgcolor: "#00fffc",
+                color: "black",
+                fontWeight: 600,
                 ":hover": {
                   bgcolor: "white",
                   color: "black",
@@ -88,6 +108,20 @@ const Signup = () => {
             >
               Signup
             </Button>
+            <Typography
+              textAlign="center"
+              mt={2}
+              fontSize="14px"
+              color="rgb(180, 180, 180)"
+            >
+              Already have an account?{" "}
+              <Link
+                to="/login"
+                style={{ color: "#00fffc", textDecoration: "none", fontWeight: 600 }}
+              >
+                Log in here
+              </Link>
+            </Typography>
           </Box>
         </form>
       </Box>

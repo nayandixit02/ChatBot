@@ -1,5 +1,12 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { Box, Avatar, Typography, Button, IconButton } from "@mui/material";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Box,
+  Avatar,
+  Typography,
+  Button,
+  IconButton,
+  CircularProgress,
+} from "@mui/material";
 import { red } from "@mui/material/colors";
 import { useAuth } from "../context/useAuth";
 import ChatItem from "../components/chat/ChatItem";
@@ -9,6 +16,7 @@ import {
   deleteUserChats,
   getUserChats,
   sendChatRequest,
+  getErrorMessage,
 } from "../helpers/api-communicator";
 import toast from "react-hot-toast";
 
@@ -20,70 +28,114 @@ type Message = {
 const Chat = () => {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const auth = useAuth();
 
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages, isSending]);
 
   const handleSubmit = async () => {
-    const content = inputRef.current?.value;
-    if (!content || content.trim() === "") return;
+    const content = inputRef.current?.value?.trim();
+    if (!content || isSending) return;
 
     if (inputRef.current) inputRef.current.value = "";
 
     const newMessage: Message = { role: "user", content };
     setChatMessages((prev) => [...prev, newMessage]);
+    setIsSending(true);
 
     try {
       const chatData = await sendChatRequest(content);
-      setChatMessages([...chatData.chats]);
+      if (chatData && chatData.chats) {
+        setChatMessages([...chatData.chats]);
+      }
     } catch (error) {
-      console.log(error);
-      toast.error("Failed to send message");
+      console.error("Chat send error:", error);
+      const msg = getErrorMessage(error, "Failed to send message");
+      toast.error(msg);
+      // Fallback assistant error message in chat UI if network/provider error
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "⚠️ Failed to get a response. Please try again in a moment.",
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
     }
   };
 
   const handleDeleteChats = async () => {
     try {
-      toast.loading("Deleting Chats", { id: "deletechats" });
+      toast.loading("Deleting Chats...", { id: "deletechats" });
       await deleteUserChats();
       setChatMessages([]);
       toast.success("Deleted Chats Successfully", { id: "deletechats" });
     } catch (error) {
-      console.log(error);
-      toast.error("Deleting chats failed", { id: "deletechats" });
+      console.error("Delete chats error:", error);
+      const msg = getErrorMessage(error, "Deleting chats failed");
+      toast.error(msg, { id: "deletechats" });
     }
   };
 
   useLayoutEffect(() => {
+    if (auth?.loading) return;
+
     if (auth?.isLoggedIn && auth.user) {
-      toast.loading("Loading Chats", { id: "loadchats" });
+      toast.loading("Loading Chats...", { id: "loadchats" });
       getUserChats()
         .then((data) => {
-          setChatMessages([...data.chats]);
+          if (data && data.chats) {
+            setChatMessages([...data.chats]);
+          }
           toast.success("Successfully loaded chats", { id: "loadchats" });
         })
         .catch((err) => {
-          console.log(err);
-          toast.error(err.response?.data?.message || "Loading Failed", {
-            id: "loadchats",
-          });
+          console.error("Get chats error:", err);
+          const msg = getErrorMessage(err, "Failed to load chats");
+          toast.error(msg, { id: "loadchats" });
         })
         .finally(() => setLoading(false));
     } else {
       navigate("/login");
     }
-  }, [auth, navigate]);
+  }, [auth?.loading, auth?.isLoggedIn, auth?.user, navigate]);
 
-  if (auth && !auth.user) {
+  if (auth?.loading) {
     return (
-      <Box p={4}>
-        <Typography color="white">
-          You must be logged in to access chats.
-        </Typography>
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        minHeight="70vh"
+        gap={2}
+      >
+        <CircularProgress sx={{ color: "#00fffc" }} />
+        <Typography color="white">Checking authorization...</Typography>
       </Box>
     );
   }
+
+  const userInitial1 = auth?.user?.name?.[0]?.toUpperCase() || "U";
+  const userInitial2 = auth?.user?.name?.split(" ")?.[1]?.[0]?.toUpperCase() || "";
 
   return (
     <Box
@@ -100,7 +152,7 @@ const Chat = () => {
       <Box
         sx={{
           display: { md: "flex", xs: "none", sm: "none" },
-          flex: 0.2,
+          flex: 0.25,
           flexDirection: "column",
         }}
       >
@@ -108,11 +160,13 @@ const Chat = () => {
           sx={{
             display: "flex",
             width: "100%",
-            height: "60vh",
+            height: "65vh",
             bgcolor: "rgb(17,29,39)",
             borderRadius: 5,
             flexDirection: "column",
             mx: 3,
+            p: 2,
+            boxSizing: "border-box",
           }}
         >
           <Avatar
@@ -122,28 +176,34 @@ const Chat = () => {
               bgcolor: "white",
               color: "black",
               fontWeight: 700,
+              width: 56,
+              height: 56,
+              fontSize: 22,
             }}
           >
-            {auth && auth.user && auth.user.name?.[0]}
-            {(auth && auth.user && auth.user.name?.split(" ")[1]?.[0]) || ""}
+            {userInitial1}
+            {userInitial2}
           </Avatar>
-          <Typography sx={{ mx: "auto", fontFamily: "work sans" }}>
-            You are talking to a ChatBOT
+          <Typography sx={{ mx: "auto", fontFamily: "work sans", fontWeight: 600 }}>
+            {auth?.user?.name || "User"}
           </Typography>
-          <Typography sx={{ mx: "auto", fontFamily: "work sans", my: 4, p: 3 }}>
-            You can ask questions about Knowledge, Business, Advice,
-            Education...
+          <Typography sx={{ mx: "auto", fontSize: "13px", color: "rgb(180, 180, 180)", mb: 2 }}>
+            {auth?.user?.email}
+          </Typography>
+          <Typography sx={{ mx: "auto", fontFamily: "work sans", textAlign: "center", my: 2, px: 2, fontSize: "14px", color: "rgb(200, 200, 200)" }}>
+            Ask Gemini questions about Coding, Knowledge, Business, Advice, Education, and more.
           </Typography>
           <Button
             onClick={handleDeleteChats}
             sx={{
               width: "200px",
-              my: "auto",
+              mt: "auto",
+              mb: 2,
               color: "white",
               fontWeight: "700",
               borderRadius: 3,
               mx: "auto",
-              bgcolor: red[300],
+              bgcolor: red[400],
               ":hover": {
                 bgcolor: red.A400,
               },
@@ -158,21 +218,22 @@ const Chat = () => {
       <Box
         sx={{
           display: "flex",
-          flex: { md: 0.8, xs: 1, sm: 1 },
+          flex: { md: 0.75, xs: 1, sm: 1 },
           flexDirection: "column",
-          px: 3,
+          px: { xs: 2, md: 3 },
         }}
       >
         <Typography
           sx={{
-            fontSize: "40px",
+            fontSize: { xs: "24px", md: "34px" },
             color: "white",
             mb: 2,
             mx: "auto",
             fontWeight: "600",
+            textAlign: "center",
           }}
         >
-          Model - gemini-2.0-flash
+          Powered by Google Gemini AI
         </Typography>
 
         <Box
@@ -186,21 +247,45 @@ const Chat = () => {
             overflowY: "auto",
             scrollBehavior: "smooth",
             backgroundColor: "rgba(255, 255, 255, 0.05)",
+            p: 2,
+            boxSizing: "border-box",
           }}
         >
           {loading ? (
-            <Typography color="white" mx="auto" mt={3}>
-              Loading chat history...
-            </Typography>
+            <Box display="flex" flexDirection="column" alignItems="center" my="auto">
+              <CircularProgress size={30} sx={{ color: "#00fffc", mb: 1 }} />
+              <Typography color="white">Loading chat history...</Typography>
+            </Box>
           ) : chatMessages.length > 0 ? (
-            chatMessages.map((chat, index) => (
-              <ChatItem content={chat.content} role={chat.role} key={index} />
-            ))
+            <>
+              {chatMessages.map((chat, index) => (
+                <ChatItem content={chat.content} role={chat.role} key={index} />
+              ))}
+              {isSending && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    p: 2,
+                    bgcolor: "#004d5612",
+                    gap: 2,
+                    borderRadius: 2,
+                    my: 1,
+                    alignItems: "center",
+                  }}
+                >
+                  <CircularProgress size={20} sx={{ color: "#00fffc" }} />
+                  <Typography sx={{ color: "#00fffc", fontSize: "16px" }}>
+                    Gemini is thinking...
+                  </Typography>
+                </Box>
+              )}
+            </>
           ) : (
-            <Typography color="white" mx="auto" mt={3}>
-              No chats yet. Start a conversation!
+            <Typography color="white" mx="auto" my="auto" textAlign="center">
+              No chats yet. Start a conversation with Gemini!
             </Typography>
           )}
+          <div ref={messagesEndRef} />
         </Box>
 
         <div
@@ -216,7 +301,9 @@ const Chat = () => {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type your message..."
+            onKeyDown={handleKeyDown}
+            disabled={isSending}
+            placeholder={isSending ? "Waiting for Gemini to respond..." : "Type your message here (Press Enter to send)..."}
             style={{
               width: "100%",
               backgroundColor: "transparent",
@@ -227,7 +314,15 @@ const Chat = () => {
               fontSize: "18px",
             }}
           />
-          <IconButton onClick={handleSubmit} sx={{ color: "white", mx: 1 }}>
+          <IconButton
+            onClick={handleSubmit}
+            disabled={isSending}
+            sx={{
+              color: isSending ? "gray" : "#00fffc",
+              mx: 1,
+              ":hover": { color: "white" },
+            }}
+          >
             <IoMdSend />
           </IconButton>
         </div>

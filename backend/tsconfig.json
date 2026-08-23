@@ -3,9 +3,13 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "sourceMap": true,
+    "rootDir": "src",
     "outDir": "dist",
-    "allowSyntheticDefaultImports": true
+    "sourceMap": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "useUnknownInCatchVariables": false
   },
-  "include": ["src/**/*.ts", "src/index.ts"]
+  "include": ["src/**/*"]
 }

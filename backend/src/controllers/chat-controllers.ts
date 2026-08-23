@@ -2,6 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import User from "../models/User.js";
 import genAI from "../config/gemini-config.js";
 
+const getErrMsg = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return String(error);
+};
+
 export const generateChatCompletion = async (
   req: Request,
   res: Response,
@@ -29,45 +34,66 @@ export const generateChatCompletion = async (
     user.chats.push({ role: "user", content: message });
 
     // Combine into full prompt
-    const fullPrompt = `${chatsText}\n${userMessage}`;
+    const fullPrompt = chatsText ? `${chatsText}\n${userMessage}` : userMessage;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // List of candidate models to try in order of preference
+    const candidateModels = [
+      process.env.GEMINI_MODEL,
+      "gemini-2.5-flash",
+      "gemini-1.5-flash",
+      "gemini-2.0-flash-exp",
+      "gemini-1.5-pro",
+      "gemini-pro",
+    ].filter(Boolean) as string[];
 
     let assistantReply: string | null = null;
-    try {
-      const result = await model.generateContent([fullPrompt]);
-      assistantReply = result.response.text();
-    } catch (err: any) {
-      console.error("Generative AI error:", err?.message ?? err);
-      // On quota/rate-limit (429), record a friendly assistant fallback message
-      if (err && err.status === 429) {
-        const retryInfo = err.errorDetails?.find((d: any) =>
-          d["@type"]?.includes("RetryInfo")
-        );
-        const retryDelay = retryInfo?.retryDelay ?? null;
-        assistantReply = `I'm temporarily unable to generate a response (AI quota exceeded). Please try again after ${
-          retryDelay ?? "a short while"
-        }.`;
-      } else {
-        return res.status(502).json({
-          message: "AI provider error",
-          cause: err?.message ?? String(err),
-        });
+    let lastError: any = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent([fullPrompt]);
+        assistantReply = result.response.text();
+        if (assistantReply) {
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} invocation failed:`, err?.message ?? err);
+
+        // On quota/rate-limit (429), surface a friendly assistant message
+        if (err && err.status === 429) {
+          const retryInfo = err.errorDetails?.find((d: any) =>
+            d["@type"]?.includes("RetryInfo")
+          );
+          const retryDelay = retryInfo?.retryDelay ?? null;
+          assistantReply = `I'm temporarily unable to generate a response (AI quota exceeded). Please try again after ${
+            retryDelay ?? "a short while"
+          }.`;
+          break;
+        }
+        // If 404 (model deprecated/not available), loop will try the next candidate model
       }
     }
 
-    if (assistantReply) {
-      user.chats.push({
-        role: "assistant",
-        content: assistantReply,
+    if (!assistantReply) {
+      console.error("All Gemini candidate models failed. Last error:", lastError);
+      return res.status(502).json({
+        message: "AI provider error",
+        cause: lastError?.message ?? String(lastError),
       });
     }
 
+    user.chats.push({
+      role: "assistant",
+      content: assistantReply,
+    });
+
     await user.save();
     return res.status(200).json({ chats: user.chats });
-  } catch (error) {
-    console.log(error);
-    return res.status(500).json({ message: "Something went wrong" });
+  } catch (error: unknown) {
+    console.error("Chat completion error:", error);
+    return res.status(500).json({ message: "Something went wrong", cause: getErrMsg(error) });
   }
 };
 
@@ -79,15 +105,15 @@ export const sendChatsToUser = async (
   try {
     const user = await User.findById(res.locals.jwtData.id);
     if (!user) {
-      return res.status(401).send("User not registered OR Token malfunctioned");
+      return res.status(401).json({ message: "User not registered OR Token malfunctioned" });
     }
     if (user._id.toString() !== res.locals.jwtData.id) {
-      return res.status(401).send("Permissions didn't match");
+      return res.status(401).json({ message: "Permissions didn't match" });
     }
     return res.status(200).json({ message: "OK", chats: user.chats || [] });
-  } catch (error: any) {
-    console.log(error);
-    return res.status(500).json({ message: "ERROR", cause: error.message });
+  } catch (error: unknown) {
+    console.error("sendChatsToUser error:", error);
+    return res.status(500).json({ message: "ERROR", cause: getErrMsg(error) });
   }
 };
 
@@ -99,10 +125,10 @@ export const deleteChats = async (
   try {
     const user = await User.findById(res.locals.jwtData.id);
     if (!user) {
-      return res.status(401).send("User not registered OR Token malfunctioned");
+      return res.status(401).json({ message: "User not registered OR Token malfunctioned" });
     }
     if (user._id.toString() !== res.locals.jwtData.id) {
-      return res.status(401).send("Permissions didn't match");
+      return res.status(401).json({ message: "Permissions didn't match" });
     }
 
     // Clear chats array
@@ -110,8 +136,8 @@ export const deleteChats = async (
     await user.save();
 
     return res.status(200).json({ message: "OK" });
-  } catch (error: any) {
-    console.log(error);
-    return res.status(500).json({ message: "ERROR", cause: error.message });
+  } catch (error: unknown) {
+    console.error("deleteChats error:", error);
+    return res.status(500).json({ message: "ERROR", cause: getErrMsg(error) });
   }
 };
