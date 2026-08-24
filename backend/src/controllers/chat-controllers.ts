@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import User from "../models/User.js";
-import genAI from "../config/gemini-config.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const getErrMsg = (error: unknown): string => {
   if (error instanceof Error) return error.message;
@@ -21,29 +21,46 @@ export const generateChatCompletion = async (
         .status(401)
         .json({ message: "User not registered OR Token malfunctioned" });
 
-    // Convert stored chats to Gemini-compatible input (flattened text)
-    const chatsText = user.chats
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY is not configured in backend environment");
+      return res.status(500).json({
+        message: "AI provider error",
+        cause: "GEMINI_API_KEY is missing from server environment variables.",
+      });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    // Build context from previous conversation, omitting error notifications
+    const validChats = (user.chats || []).filter(
+      (c: any) =>
+        c &&
+        c.content &&
+        !c.content.startsWith("⚠️") &&
+        !c.content.includes("temporarily unable")
+    );
+
+    // Use recent history for context
+    const recentHistory = validChats.slice(-10);
+    const chatsText = recentHistory
       .map(
         (chat: any) =>
           `${chat.role === "user" ? "User" : "Assistant"}: ${chat.content}`
       )
       .join("\n");
 
-    // Add new user message
-    const userMessage = `User: ${message}`;
-    user.chats.push({ role: "user", content: message });
+    const fullPrompt = chatsText
+      ? `${chatsText}\nUser: ${message}\nAssistant:`
+      : message;
 
-    // Combine into full prompt
-    const fullPrompt = chatsText ? `${chatsText}\n${userMessage}` : userMessage;
-
-    // List of candidate models to try in order of preference
+    // List of reliable Gemini models
     const candidateModels = [
       process.env.GEMINI_MODEL,
-      "gemini-2.5-flash",
       "gemini-1.5-flash",
-      "gemini-2.0-flash-exp",
       "gemini-1.5-pro",
-      "gemini-pro",
+      "gemini-1.5-flash-8b",
+      "gemini-2.0-flash-exp",
     ].filter(Boolean) as string[];
 
     let assistantReply: string | null = null;
@@ -52,17 +69,17 @@ export const generateChatCompletion = async (
     for (const modelName of candidateModels) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent([fullPrompt]);
+        const result = await model.generateContent(fullPrompt);
         assistantReply = result.response.text();
         if (assistantReply) {
           break;
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`Model ${modelName} invocation failed:`, err?.message ?? err);
+        console.warn(`Gemini model ${modelName} failed:`, err?.message ?? err);
 
         // On quota/rate-limit (429), surface a friendly assistant message
-        if (err && err.status === 429) {
+        if (err && (err.status === 429 || String(err?.message).includes("429") || String(err?.message).includes("quota"))) {
           const retryInfo = err.errorDetails?.find((d: any) =>
             d["@type"]?.includes("RetryInfo")
           );
@@ -72,7 +89,6 @@ export const generateChatCompletion = async (
           }.`;
           break;
         }
-        // If 404 (model deprecated/not available), loop will try the next candidate model
       }
     }
 
@@ -84,12 +100,11 @@ export const generateChatCompletion = async (
       });
     }
 
-    user.chats.push({
-      role: "assistant",
-      content: assistantReply,
-    });
-
+    // Save both user message and assistant reply to DB
+    user.chats.push({ role: "user", content: message });
+    user.chats.push({ role: "assistant", content: assistantReply });
     await user.save();
+
     return res.status(200).json({ chats: user.chats });
   } catch (error: unknown) {
     console.error("Chat completion error:", error);

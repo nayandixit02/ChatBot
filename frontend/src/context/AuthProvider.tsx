@@ -82,7 +82,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     delete axios.defaults.headers.common["Authorization"];
     setUser(null);
     setIsLoggedIn(false);
-    window.location.href = "/login";
   };
 
   const value: UserAuth = {

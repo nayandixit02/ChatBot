@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import genAI from "../config/gemini-config.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 const getErrMsg = (error) => {
     if (error instanceof Error)
         return error.message;
@@ -13,30 +13,42 @@ export const generateChatCompletion = async (req, res, next) => {
             return res
                 .status(401)
                 .json({ message: "User not registered OR Token malfunctioned" });
-        // Convert stored chats to Gemini-compatible input (flattened text)
-        const chatsText = user.chats
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            console.error("GEMINI_API_KEY is not configured in backend environment");
+            return res.status(500).json({
+                message: "AI provider error",
+                cause: "GEMINI_API_KEY is missing from server environment variables.",
+            });
+        }
+        const genAI = new GoogleGenerativeAI(apiKey);
+        // Build context from previous conversation, omitting error notifications
+        const validChats = (user.chats || []).filter((c) => c &&
+            c.content &&
+            !c.content.startsWith("⚠️") &&
+            !c.content.includes("temporarily unable"));
+        // Use recent history for context
+        const recentHistory = validChats.slice(-10);
+        const chatsText = recentHistory
             .map((chat) => `${chat.role === "user" ? "User" : "Assistant"}: ${chat.content}`)
             .join("\n");
-        // Add new user message
-        const userMessage = `User: ${message}`;
-        user.chats.push({ role: "user", content: message });
-        // Combine into full prompt
-        const fullPrompt = chatsText ? `${chatsText}\n${userMessage}` : userMessage;
-        // List of candidate models to try in order of preference
+        const fullPrompt = chatsText
+            ? `${chatsText}\nUser: ${message}\nAssistant:`
+            : message;
+        // List of reliable Gemini models
         const candidateModels = [
             process.env.GEMINI_MODEL,
-            "gemini-2.5-flash",
             "gemini-1.5-flash",
-            "gemini-2.0-flash-exp",
             "gemini-1.5-pro",
-            "gemini-pro",
+            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash-exp",
         ].filter(Boolean);
         let assistantReply = null;
         let lastError = null;
         for (const modelName of candidateModels) {
             try {
                 const model = genAI.getGenerativeModel({ model: modelName });
-                const result = await model.generateContent([fullPrompt]);
+                const result = await model.generateContent(fullPrompt);
                 assistantReply = result.response.text();
                 if (assistantReply) {
                     break;
@@ -44,15 +56,14 @@ export const generateChatCompletion = async (req, res, next) => {
             }
             catch (err) {
                 lastError = err;
-                console.warn(`Model ${modelName} invocation failed:`, err?.message ?? err);
+                console.warn(`Gemini model ${modelName} failed:`, err?.message ?? err);
                 // On quota/rate-limit (429), surface a friendly assistant message
-                if (err && err.status === 429) {
+                if (err && (err.status === 429 || String(err?.message).includes("429") || String(err?.message).includes("quota"))) {
                     const retryInfo = err.errorDetails?.find((d) => d["@type"]?.includes("RetryInfo"));
                     const retryDelay = retryInfo?.retryDelay ?? null;
                     assistantReply = `I'm temporarily unable to generate a response (AI quota exceeded). Please try again after ${retryDelay ?? "a short while"}.`;
                     break;
                 }
-                // If 404 (model deprecated/not available), loop will try the next candidate model
             }
         }
         if (!assistantReply) {
@@ -62,10 +73,9 @@ export const generateChatCompletion = async (req, res, next) => {
                 cause: lastError?.message ?? String(lastError),
             });
         }
-        user.chats.push({
-            role: "assistant",
-            content: assistantReply,
-        });
+        // Save both user message and assistant reply to DB
+        user.chats.push({ role: "user", content: message });
+        user.chats.push({ role: "assistant", content: assistantReply });
         await user.save();
         return res.status(200).json({ chats: user.chats });
     }
