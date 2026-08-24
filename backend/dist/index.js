@@ -1,25 +1,14 @@
-// import dotenv from "dotenv";
-// dotenv.config();
-// import app from "./app.js";
-// import { connectToDatabase } from "./db/connections.js";
-// //connections and listeners
-// const PORT = process.env.PORT || 5000;
-// connectToDatabase()
-//   .then(() => {
-//     app.listen(PORT, () => console.log("Server Open & connected to Database"));
-//   })
-//   .catch((err) => console.log(err));
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import path from "path";
 import app from "./app.js";
 import { connectToDatabase } from "./db/connections.js";
-// Serve frontend static files in production
+// Serve frontend static files only for non-API routes in production
 if (process.env.NODE_ENV === "production") {
     const __dirname = path.resolve();
     app.use(express.static(path.join(__dirname, "public")));
-    app.get("*", (req, res) => {
+    app.get(/^(?!\/api|\/test-key).*/, (req, res) => {
         res.sendFile(path.resolve(__dirname, "public", "index.html"));
     });
 }
