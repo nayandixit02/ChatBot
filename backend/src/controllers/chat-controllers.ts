@@ -22,14 +22,15 @@ export const testGeminiKey = async (req: Request, res: Response) => {
 
   const modelsToTest = [
     process.env.GEMINI_MODEL,
+    "gemini-3.6-flash",
+    "gemini-3.6-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
   ].filter(Boolean) as string[];
 
   const results: Record<string, any> = {};
-
   const genAI = new GoogleGenerativeAI(apiKey);
 
   for (const m of modelsToTest) {
@@ -99,14 +100,15 @@ export const generateChatCompletion = async (
       ? `${chatsText}\nUser: ${message}\nAssistant:`
       : message;
 
-    // List of reliable Gemini models
+    // List of candidate models in order of priority
     const candidateModels = [
       process.env.GEMINI_MODEL,
+      "gemini-3.6-flash",
+      "gemini-3.6-pro",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
       "gemini-1.5-flash",
       "gemini-1.5-pro",
-      "gemini-1.5-flash-8b",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash",
     ].filter(Boolean) as string[];
 
     let assistantReply: string | null = null;

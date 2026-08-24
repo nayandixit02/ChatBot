@@ -18,10 +18,12 @@ export const testGeminiKey = async (req, res) => {
         : "INVALID_KEY_LENGTH";
     const modelsToTest = [
         process.env.GEMINI_MODEL,
+        "gemini-3.6-flash",
+        "gemini-3.6-pro",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
-        "gemini-2.0-flash",
-        "gemini-2.5-flash",
     ].filter(Boolean);
     const results = {};
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -73,14 +75,15 @@ export const generateChatCompletion = async (req, res, next) => {
         const fullPrompt = chatsText
             ? `${chatsText}\nUser: ${message}\nAssistant:`
             : message;
-        // List of reliable Gemini models
+        // List of candidate models in order of priority
         const candidateModels = [
             process.env.GEMINI_MODEL,
+            "gemini-3.6-flash",
+            "gemini-3.6-pro",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
             "gemini-1.5-flash",
             "gemini-1.5-pro",
-            "gemini-1.5-flash-8b",
-            "gemini-2.0-flash",
-            "gemini-2.5-flash",
         ].filter(Boolean);
         let assistantReply = null;
         const modelErrors = {};
