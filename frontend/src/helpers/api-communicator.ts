@@ -4,7 +4,15 @@ export const getErrorMessage = (error: unknown, defaultMsg: string): string => {
   if (axios.isAxiosError(error)) {
     if (error.response?.data) {
       if (typeof error.response.data === "string") {
-        return error.response.data;
+        const raw = error.response.data;
+        if (raw.includes("<pre>")) {
+          const match = raw.match(/<pre>([\s\S]*?)<\/pre>/i);
+          if (match && match[1]) return match[1].trim();
+        }
+        if (raw.startsWith("<!DOCTYPE") || raw.startsWith("<html")) {
+          return defaultMsg;
+        }
+        return raw;
       }
       if (typeof error.response.data === "object") {
         const data = error.response.data as any;

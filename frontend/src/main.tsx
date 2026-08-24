@@ -7,12 +7,19 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider.tsx";
 import { Toaster } from "react-hot-toast";
 import axios from "axios";
-const backendUrl =
+
+// Normalize backend URL to ensure it points to /api/v1 properly
+let rawBackendUrl =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
   "https://chatbot-backend-9rf1.onrender.com/api/v1";
 
-axios.defaults.baseURL = backendUrl;
+rawBackendUrl = rawBackendUrl.replace(/\/+$/, "");
+if (!rawBackendUrl.endsWith("/api/v1")) {
+  rawBackendUrl = `${rawBackendUrl}/api/v1`;
+}
+
+axios.defaults.baseURL = rawBackendUrl;
 axios.defaults.withCredentials = true;
 
 // Preload token if exists in storage
@@ -36,6 +43,7 @@ const theme = createTheme({
     allVariants: { color: "white" },
   },
 });
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>

@@ -44,6 +44,8 @@ if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
+// Mount routes at both /api/v1 and root / for maximum compatibility
 app.use("/api/v1", appRouter);
+app.use("/", appRouter);
 
 export default app;
