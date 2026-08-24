@@ -5,6 +5,44 @@ const getErrMsg = (error) => {
         return error.message;
     return String(error);
 };
+export const testGeminiKey = async (req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return res.status(200).json({
+            ok: false,
+            error: "GEMINI_API_KEY is not set in backend environment variables.",
+        });
+    }
+    const maskedKey = apiKey.length > 10
+        ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`
+        : "INVALID_KEY_LENGTH";
+    const modelsToTest = [
+        process.env.GEMINI_MODEL,
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+    ].filter(Boolean);
+    const results = {};
+    const genAI = new GoogleGenerativeAI(apiKey);
+    for (const m of modelsToTest) {
+        try {
+            const model = genAI.getGenerativeModel({ model: m });
+            const result = await model.generateContent("Respond with: WORKING");
+            const response = await result.response;
+            results[m] = { success: true, text: response.text()?.trim() };
+        }
+        catch (err) {
+            results[m] = { success: false, error: err?.message || String(err) };
+        }
+    }
+    const anySuccess = Object.values(results).some((r) => r.success);
+    return res.status(200).json({
+        ok: anySuccess,
+        maskedKey,
+        results,
+    });
+};
 export const generateChatCompletion = async (req, res, next) => {
     const { message } = req.body;
     try {
@@ -41,24 +79,30 @@ export const generateChatCompletion = async (req, res, next) => {
             "gemini-1.5-flash",
             "gemini-1.5-pro",
             "gemini-1.5-flash-8b",
-            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
         ].filter(Boolean);
         let assistantReply = null;
-        let lastError = null;
+        const modelErrors = {};
         for (const modelName of candidateModels) {
             try {
                 const model = genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent(fullPrompt);
-                assistantReply = result.response.text();
+                const response = await result.response;
+                assistantReply = response.text();
                 if (assistantReply) {
                     break;
                 }
             }
             catch (err) {
-                lastError = err;
+                modelErrors[modelName] = err?.message ?? String(err);
                 console.warn(`Gemini model ${modelName} failed:`, err?.message ?? err);
                 // On quota/rate-limit (429), surface a friendly assistant message
-                if (err && (err.status === 429 || String(err?.message).includes("429") || String(err?.message).includes("quota"))) {
+                if (err &&
+                    (err.status === 429 ||
+                        String(err?.message).includes("429") ||
+                        String(err?.message).includes("quota") ||
+                        String(err?.message).includes("RESOURCE_EXHAUSTED"))) {
                     const retryInfo = err.errorDetails?.find((d) => d["@type"]?.includes("RetryInfo"));
                     const retryDelay = retryInfo?.retryDelay ?? null;
                     assistantReply = `I'm temporarily unable to generate a response (AI quota exceeded). Please try again after ${retryDelay ?? "a short while"}.`;
@@ -67,10 +111,11 @@ export const generateChatCompletion = async (req, res, next) => {
             }
         }
         if (!assistantReply) {
-            console.error("All Gemini candidate models failed. Last error:", lastError);
+            console.error("All Gemini candidate models failed:", modelErrors);
             return res.status(502).json({
                 message: "AI provider error",
-                cause: lastError?.message ?? String(lastError),
+                cause: JSON.stringify(modelErrors),
+                modelErrors,
             });
         }
         // Save both user message and assistant reply to DB

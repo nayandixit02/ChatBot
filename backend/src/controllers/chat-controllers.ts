@@ -7,6 +7,51 @@ const getErrMsg = (error: unknown): string => {
   return String(error);
 };
 
+export const testGeminiKey = async (req: Request, res: Response) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(200).json({
+      ok: false,
+      error: "GEMINI_API_KEY is not set in backend environment variables.",
+    });
+  }
+
+  const maskedKey = apiKey.length > 10
+    ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`
+    : "INVALID_KEY_LENGTH";
+
+  const modelsToTest = [
+    process.env.GEMINI_MODEL,
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+  ].filter(Boolean) as string[];
+
+  const results: Record<string, any> = {};
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  for (const m of modelsToTest) {
+    try {
+      const model = genAI.getGenerativeModel({ model: m });
+      const result = await model.generateContent("Respond with: WORKING");
+      const response = await result.response;
+      results[m] = { success: true, text: response.text()?.trim() };
+    } catch (err: any) {
+      results[m] = { success: false, error: err?.message || String(err) };
+    }
+  }
+
+  const anySuccess = Object.values(results).some((r: any) => r.success);
+
+  return res.status(200).json({
+    ok: anySuccess,
+    maskedKey,
+    results,
+  });
+};
+
 export const generateChatCompletion = async (
   req: Request,
   res: Response,
@@ -60,26 +105,34 @@ export const generateChatCompletion = async (
       "gemini-1.5-flash",
       "gemini-1.5-pro",
       "gemini-1.5-flash-8b",
-      "gemini-2.0-flash-exp",
+      "gemini-2.0-flash",
+      "gemini-2.5-flash",
     ].filter(Boolean) as string[];
 
     let assistantReply: string | null = null;
-    let lastError: any = null;
+    const modelErrors: Record<string, string> = {};
 
     for (const modelName of candidateModels) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(fullPrompt);
-        assistantReply = result.response.text();
+        const response = await result.response;
+        assistantReply = response.text();
         if (assistantReply) {
           break;
         }
       } catch (err: any) {
-        lastError = err;
+        modelErrors[modelName] = err?.message ?? String(err);
         console.warn(`Gemini model ${modelName} failed:`, err?.message ?? err);
 
         // On quota/rate-limit (429), surface a friendly assistant message
-        if (err && (err.status === 429 || String(err?.message).includes("429") || String(err?.message).includes("quota"))) {
+        if (
+          err &&
+          (err.status === 429 ||
+            String(err?.message).includes("429") ||
+            String(err?.message).includes("quota") ||
+            String(err?.message).includes("RESOURCE_EXHAUSTED"))
+        ) {
           const retryInfo = err.errorDetails?.find((d: any) =>
             d["@type"]?.includes("RetryInfo")
           );
@@ -93,10 +146,11 @@ export const generateChatCompletion = async (
     }
 
     if (!assistantReply) {
-      console.error("All Gemini candidate models failed. Last error:", lastError);
+      console.error("All Gemini candidate models failed:", modelErrors);
       return res.status(502).json({
         message: "AI provider error",
-        cause: lastError?.message ?? String(lastError),
+        cause: JSON.stringify(modelErrors),
+        modelErrors,
       });
     }
 

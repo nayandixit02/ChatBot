@@ -6,17 +6,20 @@ import {
   deleteChats,
   generateChatCompletion,
   sendChatsToUser,
+  testGeminiKey,
 } from "../controllers/chat-controllers.js";
 
-//Protected API
 const chatRoutes = Router();
+
+// Endpoint to test Gemini API key status directly
+chatRoutes.get("/test-key", testGeminiKey);
+
 chatRoutes.post(
   "/new",
   validate(chatCompletionValidator),
   verifyToken,
   generateChatCompletion
 );
-//chatRoutes.get("/all-chats", verifyToken, sendChatsToUser);
 chatRoutes.get("/chats", verifyToken, sendChatsToUser);
 chatRoutes.delete("/delete", verifyToken, deleteChats);
 
