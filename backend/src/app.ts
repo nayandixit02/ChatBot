@@ -4,6 +4,7 @@ import morgan from "morgan";
 import appRouter from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import { testGeminiKey } from "./controllers/chat-controllers.js";
 
 config();
 const app = express();
@@ -43,6 +44,10 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
+
+// Health-check and API Key test endpoints
+app.get("/test-key", testGeminiKey);
+app.get("/api/v1/test-key", testGeminiKey);
 
 // Mount routes at both /api/v1 and root / for maximum compatibility
 app.use("/api/v1", appRouter);
