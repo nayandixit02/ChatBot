@@ -16,7 +16,7 @@ const Header = () => {
   return (
     <AppBar
       sx={{
-        bgcolor: isDark ? "rgba(6, 13, 23, 0.85)" : "rgba(241, 245, 249, 0.85)",
+        bgcolor: isDark ? "rgba(6, 13, 23, 0.85)" : "rgba(255, 255, 255, 0.85)",
         backdropFilter: "blur(12px)",
         position: "sticky",
         top: 0,
@@ -32,24 +32,31 @@ const Header = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          px: { xs: 1.5, sm: 3 },
-          py: 0.5,
+          px: { xs: 2, sm: 3 },
+          py: 0.8,
         }}
       >
         <Logo />
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.5, sm: 1.5 } }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: { xs: 1, sm: 1.5 },
+          }}
+        >
           {/* Theme Toggle Button */}
           <Tooltip title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}>
             <IconButton
               onClick={toggleTheme}
               sx={{
-                p: 1.2,
+                p: 1.1,
                 borderRadius: "12px",
-                bgcolor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+                bgcolor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
                 border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.1)"}`,
                 color: isDark ? "#facc15" : "#0284c7",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                mr: { xs: 0.5, sm: 1 },
                 "&:hover": {
                   bgcolor: isDark ? "rgba(250, 204, 21, 0.15)" : "rgba(2, 132, 199, 0.12)",
                   transform: "rotate(15deg) scale(1.05)",
@@ -61,36 +68,36 @@ const Header = () => {
           </Tooltip>
 
           {auth?.isLoggedIn ? (
-            <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <NavigationLink
                 bg={isDark ? "#00fffc" : "#0284c7"}
                 to="/chat"
                 text="Go To Chat"
-                textColor={isDark ? "black" : "white"}
+                textColor={isDark ? "#000000" : "#ffffff"}
               />
               <NavigationLink
                 bg={isDark ? "#51538f" : "#475569"}
-                textColor="white"
+                textColor="#ffffff"
                 to="/"
                 text="Logout"
                 onClick={auth.logout}
               />
-            </>
+            </Box>
           ) : (
-            <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <NavigationLink
                 bg={isDark ? "#00fffc" : "#0284c7"}
                 to="/login"
                 text="Login"
-                textColor={isDark ? "black" : "white"}
+                textColor={isDark ? "#000000" : "#ffffff"}
               />
               <NavigationLink
                 bg={isDark ? "#51538f" : "#475569"}
-                textColor="white"
+                textColor="#ffffff"
                 to="/signup"
                 text="Signup"
               />
-            </>
+            </Box>
           )}
         </Box>
       </Toolbar>
