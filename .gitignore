@@ -1,2 +1,10 @@
 .env
 node_modules/
+coverage/
+backend/coverage/
+
+# Interview prep guides & generated PDF files
+*.pdf
+interview_guide.html
+interview_guide*
+

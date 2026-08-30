@@ -1,0 +1,90 @@
+name: CI/CD Pipeline - Test, Lint & Auto-Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-lint:
+    name: Test & Lint Backend & Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      # Backend Test & Build Steps
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run Backend Unit & Integration Tests with Coverage
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test_jwt_secret_key_123456789' }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || 'test_cookie_secret_key_123456789' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyFakeKeyForTesting1234567890' }}
+        run: npm run test:coverage
+
+      - name: Build Backend (TypeScript Compilation)
+        working-directory: backend
+        run: npm run build
+
+      # Frontend Lint & Build Steps
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Frontend Lint Checks
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build Frontend (Vite Production Build)
+        working-directory: frontend
+        run: npm run build
+
+  deploy:
+    name: Auto-Deploy to Render
+    needs: test-and-lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::warning ::RENDER_DEPLOY_HOOK_URL secret is not configured in repository secrets. Skipping Render webhook call."
+            exit 0
+          fi
+          echo "Triggering Render deployment..."
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+          http_status=$(echo "$response" | grep "HTTP_STATUS" | cut -d':' -f2)
+          body=$(echo "$response" | grep -v "HTTP_STATUS")
+          echo "Render Response: $body"
+          if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+            echo "Successfully triggered Render deployment (HTTP $http_status)."
+          else
+            echo "::error ::Failed to trigger Render deployment (HTTP $http_status)."
+            exit 1
+          fi
