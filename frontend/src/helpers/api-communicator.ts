@@ -14,13 +14,19 @@ export const getErrorMessage = (error: unknown, defaultMsg: string): string => {
         }
         return raw;
       }
-      if (typeof error.response.data === "object") {
-        const data = error.response.data as any;
+      if (typeof error.response.data === "object" && error.response.data !== null) {
+        const data = error.response.data as {
+          message?: string;
+          errors?: Array<{ msg?: string; message?: string }>;
+        };
         if (data.message) {
           return data.message;
         }
         if (Array.isArray(data.errors) && data.errors.length > 0) {
-          return data.errors.map((e: any) => e.msg || e.message).join(", ");
+          return data.errors
+            .map((e) => e.msg || e.message || "")
+            .filter(Boolean)
+            .join(", ");
         }
       }
     }

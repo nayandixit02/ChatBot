@@ -16,6 +16,7 @@ const ThemeContext = createContext<ThemeContextType>({
   isDark: true,
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useThemeMode = () => useContext(ThemeContext);
 
 export const CustomThemeProvider = ({ children }: { children: React.ReactNode }) => {
