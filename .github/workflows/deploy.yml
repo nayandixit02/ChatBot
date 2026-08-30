@@ -81,12 +81,12 @@ jobs:
 
           # 1. Trigger Backend Deployment
           if [ -n "$RENDER_BACKEND_DEPLOY_HOOK_URL" ]; then
-            echo "🚀 Triggering Backend deployment on Render..."
+            echo "Triggering Backend deployment on Render..."
             res_back=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$RENDER_BACKEND_DEPLOY_HOOK_URL")
             status_back=$(echo "$res_back" | grep "HTTP_STATUS" | cut -d':' -f2)
             echo "Backend Render Response: $(echo "$res_back" | grep -v 'HTTP_STATUS')"
             if [ "$status_back" -ge 200 ] && [ "$status_back" -lt 300 ]; then
-              echo "✅ Backend deployment successfully triggered (HTTP $status_back)."
+              echo "Backend deployment successfully triggered (HTTP $status_back)."
             else
               echo "::error ::Backend deployment failed to trigger (HTTP $status_back)."
               exit 1
@@ -95,12 +95,12 @@ jobs:
 
           # 2. Trigger Frontend Deployment (if configured)
           if [ -n "$RENDER_FRONTEND_DEPLOY_HOOK_URL" ]; then
-            echo "🚀 Triggering Frontend deployment on Render..."
+            echo "Triggering Frontend deployment on Render..."
             res_front=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$RENDER_FRONTEND_DEPLOY_HOOK_URL")
             status_front=$(echo "$res_front" | grep "HTTP_STATUS" | cut -d':' -f2)
             echo "Frontend Render Response: $(echo "$res_front" | grep -v 'HTTP_STATUS')"
             if [ "$status_front" -ge 200 ] && [ "$status_front" -lt 300 ]; then
-              echo "✅ Frontend deployment successfully triggered (HTTP $status_front)."
+              echo "Frontend deployment successfully triggered (HTTP $status_front)."
             else
               echo "::error ::Frontend deployment failed to trigger (HTTP $status_front)."
               exit 1

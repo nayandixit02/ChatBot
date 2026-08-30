@@ -13,6 +13,7 @@ import {
 import { red } from "@mui/material/colors";
 import { useAuth } from "../context/useAuth";
 import { useThemeMode } from "../context/ThemeContext";
+import { useChatStore } from "../store/chatStore";
 import ChatItem from "../components/chat/ChatItem";
 import { IoMdSend } from "react-icons/io";
 import {
@@ -22,18 +23,6 @@ import {
   HiOutlineArrowDown,
 } from "react-icons/hi";
 import { useNavigate } from "react-router-dom";
-import {
-  deleteUserChats,
-  getUserChats,
-  sendChatRequest,
-  getErrorMessage,
-} from "../helpers/api-communicator";
-import toast from "react-hot-toast";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 const SUGGESTED_PROMPTS = [
   {
@@ -63,9 +52,15 @@ const Chat = () => {
   const auth = useAuth();
   const { isDark } = useThemeMode();
 
-  const [chatMessages, setChatMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false);
+  // Zustand Store Slices
+  const chatMessages = useChatStore((state) => state.chatMessages);
+  const loading = useChatStore((state) => state.loading);
+  const isSending = useChatStore((state) => state.isSending);
+  const loadChats = useChatStore((state) => state.loadChats);
+  const sendPrompt = useChatStore((state) => state.sendPrompt);
+  const clearChats = useChatStore((state) => state.clearChats);
+
+  // Local UI State
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
@@ -92,29 +87,7 @@ const Chat = () => {
       inputRef.current.value = "";
     }
 
-    const newMessage: Message = { role: "user", content };
-    setChatMessages((prev) => [...prev, newMessage]);
-    setIsSending(true);
-
-    try {
-      const chatData = await sendChatRequest(content);
-      if (chatData && chatData.chats) {
-        setChatMessages([...chatData.chats]);
-      }
-    } catch (error) {
-      console.error("Chat send error:", error);
-      const msg = getErrorMessage(error, "Failed to send message");
-      toast.error(msg);
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "⚠️ Failed to get a response. Please try again in a moment.",
-        },
-      ]);
-    } finally {
-      setIsSending(false);
-    }
+    await sendPrompt(content);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -127,15 +100,10 @@ const Chat = () => {
   const handleDeleteChats = async () => {
     if (window.confirm("Are you sure you want to clear the entire conversation?")) {
       try {
-        toast.loading("Clearing Conversation...", { id: "deletechats" });
-        await deleteUserChats();
-        setChatMessages([]);
-        toast.success("Conversation cleared successfully", { id: "deletechats" });
+        await clearChats();
         setMobileDrawerOpen(false);
       } catch (error) {
         console.error("Delete chats error:", error);
-        const msg = getErrorMessage(error, "Failed to clear chats");
-        toast.error(msg, { id: "deletechats" });
       }
     }
   };
@@ -144,24 +112,11 @@ const Chat = () => {
     if (auth?.loading) return;
 
     if (auth?.isLoggedIn && auth.user) {
-      toast.loading("Loading Chats...", { id: "loadchats" });
-      getUserChats()
-        .then((data) => {
-          if (data && data.chats) {
-            setChatMessages([...data.chats]);
-          }
-          toast.success("Loaded chat history", { id: "loadchats" });
-        })
-        .catch((err) => {
-          console.error("Get chats error:", err);
-          const msg = getErrorMessage(err, "Failed to load chats");
-          toast.error(msg, { id: "loadchats" });
-        })
-        .finally(() => setLoading(false));
+      loadChats();
     } else {
       navigate("/login");
     }
-  }, [auth?.loading, auth?.isLoggedIn, auth?.user, navigate]);
+  }, [auth?.loading, auth?.isLoggedIn, auth?.user, navigate, loadChats]);
 
   if (auth?.loading) {
     return (
